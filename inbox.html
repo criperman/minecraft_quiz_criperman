@@ -1,1 +1,250 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"> <!-- telefon uchun -->
+    <title>Ilon o'yini</title>
+    <style>
+        html, body {
+            height: 100%;
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+        }
+        body { 
+            text-align: center; 
+            background: #f10606;
+            color: #c801fa; 
+            width: 1000px;
+            height: 500px;
+        }
+        canvas { 
+            background: transparent;
+            margin: 0;
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100% ;
+            height: 700px;
+            display: block;
+            background: #4d06f1;
+        }
+        h1 { font-family: Arial, sans-serif; }
+        button { padding: 10px 20px; font-size: 16px; cursor: pointer;  background: #333; color: #fff; border: none; border-radius: 5px; }
+        button:hover { background: #444; color: #fff; }
 
+        /* Boshqaruv tugmalari */
+        #controls {
+            position: fixed;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 10;
+        }
+        #controls button {
+            width: 60px;
+            height: 60px;
+            margin: 5px;
+            font-size: 24px;
+            cursor: pointer;
+            background: #333;
+            color: #fff;
+            border: none;
+            border-radius: 5px;
+        }
+        #controls button:hover {
+            background: #444;
+            color: #fff;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="game"></canvas>
+    <button id="restart" style="display:none; margin-top:10px;">Qayta boshlash</button>
+
+    <div id="controls">
+        <button id="up">⬆️</button><br>
+        <button id="left">⬅️</button>
+        <button id="down">⬇️</button>
+        <button id="right">➡️</button>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('game');
+        const ctx = canvas.getContext('2d');
+        const grid = 40; // Ilon va olma kattaligi oshadi
+        let snake, dx, dy, food, score, gameOver;
+
+        const snakeHeads = [
+            'https://upload.wikimedia.org/wikipedia/commons/thumb/f/fb/Minecraft-creeper-face.jpg/500px-Minecraft-creeper-face.jpg',
+            'https://mc-heads.net/avatar/MHF_Steve',
+            'https://i.pinimg.com/236x/dc/da/6b/dcda6bb4bac8a551c7deea5a45a23bbd.jpg',
+            'https://d31sxl6qgne2yj.cloudfront.net/wordpress/wp-content/uploads/20190121140743/Minecraft-Wither-Skeleton-Head.jpg',
+            'https://minecraftfaces.com/wp-content/bigfaces/big-enderdragon-face.png'
+        ];
+        const apples = [
+            'https://static.wikia.nocookie.net/minecraft_gamepedia/images/5/54/Golden_Apple_JE2_BE2.png',
+        ];
+        let headImg = new Image();
+        let appleImg = new Image();
+        let currentHead = 0;
+        let currentApple = 0;
+        const tailColors = [
+            'lime', 'blue', '#fff', '#555555', '#c801fa'
+        ];
+        let currentTailColor = 0;
+
+        function initGame() {
+            snake = [{x: 200, y: 200}];
+            dx = grid; dy = 0;
+            food = {x: 0, y: 0};
+            score = 0;
+            gameOver = false;
+            placeFood();
+            document.getElementById('restart').style.display = 'none';
+        }
+
+        // Canvasni oynaga moslashtirish
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        function placeFood() {
+            food.x = Math.floor(Math.random() * (canvas.width / grid)) * grid;
+            food.y = Math.floor(Math.random() * (canvas.height / grid)) * grid;
+            // Olma har safar joylashganda rasmni yangilash
+            updateImages();
+        }
+
+        function updateImages() {
+            headImg.src = snakeHeads[currentHead];
+            appleImg.src = apples[currentApple];
+        }
+        updateImages();
+
+        function gameLoop() {
+            if (gameOver) {
+                ctx.fillStyle = '#000';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.fillStyle = 'red';
+                ctx.font = '40px Arial';
+                ctx.fillText("Sen yutqazding!", canvas.width/2 - 150, canvas.height/2 - 20);
+                ctx.fillStyle = '#fff';
+                ctx.font = '30px Arial';
+                ctx.fillText('Ball: ' + score, canvas.width/2 - 60, canvas.height/2 + 30);
+
+                // Tugmalarni ko‘rsatish
+                const restartBtn = document.getElementById('restart');
+                const noBtn = document.getElementById('no-btn');
+                restartBtn.style.display = 'inline-block';
+                restartBtn.style.position = 'absolute';
+                restartBtn.style.left = (canvas.offsetLeft + canvas.width/2 - restartBtn.offsetWidth/2) + 'px';
+                restartBtn.style.top = (canvas.offsetTop + canvas.height/2 + 60) + 'px';
+
+                return;
+            }
+
+            const head = {x: snake[0].x + dx, y: snake[0].y + dy};
+            snake.unshift(head);
+
+            // O'yin ichida ball oshganda chaqiring:
+            if (head.x === food.x && head.y === food.y) {
+                score++;
+                checkScoreChange();
+                placeFood();
+            } else {
+                snake.pop();
+            }
+
+            if (
+                head.x < 0 || head.x >= canvas.width ||
+                head.y < 0 || head.y >= canvas.height ||
+                snake.slice(1).some(s => s.x === head.x && s.y === head.y)
+            ) {
+                gameOver = true;
+            }
+
+            ctx.fillStyle = '#000';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Ilon tanasi (dum)
+            ctx.fillStyle = tailColors[currentTailColor];
+            snake.slice(1).forEach(s => ctx.fillRect(s.x, s.y, grid, grid));
+
+            // Ilon boshiga rasm
+            ctx.drawImage(headImg, snake[0].x, snake[0].y, grid, grid);
+
+            // Ovqat (olma) rasm
+            ctx.drawImage(appleImg, food.x, food.y, grid, grid);
+
+            ctx.fillStyle = '#fff';
+            ctx.font = '20px Arial';
+            ctx.fillText('Ball: ' + score, 10, 390);
+        }
+
+        // Ball oshganda rasmni o'zgartirish
+        function checkScoreChange() {
+            if (score > 0 && score % 5 === 0) {
+                currentHead = (currentHead + 1) % snakeHeads.length;
+                currentApple = (currentApple + 1) % apples.length;
+                currentTailColor = (currentTailColor + 1) % tailColors.length;
+                updateImages();
+            }
+        }
+
+        document.addEventListener('keydown', e => {
+            if ((e.key === 'ArrowLeft' || e.key.toLowerCase() === 'a') && dx === 0) { dx = -grid; dy = 0; }
+            if ((e.key === 'ArrowUp'   || e.key.toLowerCase() === 'w') && dy === 0) { dx = 0; dy = -grid; }
+            if ((e.key === 'ArrowRight'|| e.key.toLowerCase() === 'd') && dx === 0) { dx = grid; dy = 0; }
+            if ((e.key === 'ArrowDown' || e.key.toLowerCase() === 's') && dy === 0) { dx = 0; dy = grid; }
+        });
+
+        // Touch boshqaruv (swipe yoki tap)
+        let touchStartX = null, touchStartY = null;
+        canvas.addEventListener('touchstart', function(e) {
+            const t = e.touches[0];
+            touchStartX = t.clientX;
+            touchStartY = t.clientY;
+        });
+        canvas.addEventListener('touchend', function(e) {
+            if (touchStartX === null || touchStartY === null) return;
+            const t = e.changedTouches[0];
+            const dxTouch = t.clientX - touchStartX;
+            const dyTouch = t.clientY - touchStartY;
+            if (Math.abs(dxTouch) > Math.abs(dyTouch)) {
+                if (dxTouch > 30 && dx === 0) { dx = grid; dy = 0; } // o'ng
+                else if (dxTouch < -30 && dx === 0) { dx = -grid; dy = 0; } // chap
+            } else {
+                if (dyTouch > 30 && dy === 0) { dx = 0; dy = grid; } // pastga
+                else if (dyTouch < -30 && dy === 0) { dx = 0; dy = -grid; } // yuqoriga
+            }
+            touchStartX = null; touchStartY = null;
+        });
+
+        document.getElementById('restart').onclick = function() {
+            initGame();
+            document.getElementById('no-btn').style.display = 'none';
+        };
+
+        // Boshqaruv tugmalari
+        document.getElementById('up').onclick = function() {
+            if (dy === 0) { dx = 0; dy = -grid; }
+        };
+        document.getElementById('down').onclick = function() {
+            if (dy === 0) { dx = 0; dy = grid; }
+        };
+        document.getElementById('left').onclick = function() {
+            if (dx === 0) { dx = -grid; dy = 0; }
+        };
+        document.getElementById('right').onclick = function() {
+            if (dx === 0) { dx = grid; dy = 0; }
+        };
+
+        initGame();
+        setInterval(gameLoop, 150);
+    </script>
+</body>
+</html>
